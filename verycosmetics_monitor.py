@@ -366,14 +366,25 @@ def notify_back_in_stock(product):
 
 def load_snapshot():
     if os.path.exists(SNAPSHOT_FILE):
-        with open(SNAPSHOT_FILE) as f:
-            return json.load(f)
+        try:
+            with open(SNAPSHOT_FILE) as f:
+                return json.load(f)
+        except json.JSONDecodeError as exc:
+            backup = f"{SNAPSHOT_FILE}.corrupted.{int(time.time())}"
+            print(f"  [!] Snapshot corrupted ({exc}) — backing up to {backup} and starting fresh")
+            try:
+                os.rename(SNAPSHOT_FILE, backup)
+            except OSError:
+                pass
+            return {}
     return {}
 
 
 def save_snapshot(data):
-    with open(SNAPSHOT_FILE, "w") as f:
+    tmp = f"{SNAPSHOT_FILE}.tmp"
+    with open(tmp, "w") as f:
         json.dump(data, f, indent=2)
+    os.replace(tmp, SNAPSHOT_FILE)
 
 
 def snapshot_entry(product):

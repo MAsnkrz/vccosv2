@@ -523,7 +523,11 @@ def run_check():
         # Only scrape product page for NEW in-stock products
         # to detect volume pricing. Everything else (barcode, price,
         # availability) comes from the products.json — no page scrapes needed.
-        if pid in new_ids and now_in_stock and product.get("handle"):
+        # IMPORTANT: never scrape during the first-run baseline — on that run
+        # every product counts as "new" (no snapshot yet exists), so this
+        # would otherwise try to scrape all ~2600+ product pages individually,
+        # triggering 503s from the server and blowing the job timeout.
+        if (not is_first_run) and pid in new_ids and now_in_stock and product.get("handle"):
             time.sleep(REQUEST_DELAY + random.uniform(0, 0.3))
             page_data = scrape_product_page(product["handle"])
             if page_data.get("volume_pricing"):

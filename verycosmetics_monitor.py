@@ -107,8 +107,10 @@ def fetch_collection():
 
 def parse_product(raw):
     """
-    Parse Shopify product JSON into a lightweight snapshot dict.
-    Price/stock come from JSON only — no page scrapes at this stage.
+    Parse Shopify product JSON into a snapshot dict.
+    The JSON already contains barcode, price, and availability —
+    no product page scrapes needed for standard monitoring.
+    Volume pricing is fetched via page scrape for new products only.
     """
     variants = raw.get("variants", [])
     avail    = [v for v in variants if v.get("available")]
@@ -116,6 +118,7 @@ def parse_product(raw):
 
     price         = v.get("price", "") or ""
     compare_price = v.get("compare_at_price", "") or ""
+    # Barcode comes from JSON — no page scrape needed
     barcode       = (v.get("barcode") or "").strip()
     sku           = (v.get("sku") or "").strip()
     in_stock      = bool(avail)
@@ -136,8 +139,8 @@ def parse_product(raw):
         "price":         price,
         "compare_price": compare_price if compare_price and compare_price != price else "",
         "in_stock":      in_stock,
-        "stock":         None,           # filled by page scrape when needed
-        "volume_pricing":[],             # filled by page scrape when needed
+        "stock":         None,        # not needed — use in_stock flag from JSON
+        "volume_pricing":[],          # filled by page scrape for new products only
     }
 
 # ---------------------------------------------------------------------------
@@ -517,22 +520,17 @@ def run_check():
         was_in_stock  = old.get("in_stock", True) if old else True
         now_in_stock  = product["in_stock"]
 
-        needs_scrape = (
-            pid in new_ids and now_in_stock         # new + in stock
-        ) or (
-            not was_in_stock and now_in_stock        # back in stock
-        )
-
-        if needs_scrape and product.get("handle"):
+        # Only scrape product page for NEW in-stock products
+        # to detect volume pricing. Everything else (barcode, price,
+        # availability) comes from the products.json — no page scrapes needed.
+        if pid in new_ids and now_in_stock and product.get("handle"):
             time.sleep(REQUEST_DELAY + random.uniform(0, 0.3))
             page_data = scrape_product_page(product["handle"])
-            if page_data.get("stock") is not None:
-                product["stock"] = page_data["stock"]
-                product["in_stock"] = product["stock"] > 0
-            if page_data.get("barcode") and not product["barcode"]:
-                product["barcode"] = page_data["barcode"]
             if page_data.get("volume_pricing"):
                 product["volume_pricing"] = page_data["volume_pricing"]
+            # Barcode fallback if JSON had it empty
+            if page_data.get("barcode") and not product["barcode"]:
+                product["barcode"] = page_data["barcode"]
 
         # --- Step 3: First run — just build snapshot, no alerts ---
         if is_first_run:

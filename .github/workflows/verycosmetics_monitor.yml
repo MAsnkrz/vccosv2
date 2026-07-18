@@ -5,6 +5,11 @@ on:
     - cron: "*/20 * * * *"   # every 20 minutes
   workflow_dispatch:
 
+# Cancel any in-progress run when a new one starts
+concurrency:
+  group: verycosmetics-monitor
+  cancel-in-progress: true
+
 permissions:
   contents: write
 

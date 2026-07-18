@@ -1,0 +1,48 @@
+name: Very Cosmetics Monitor
+
+on:
+  schedule:
+    - cron: "0 0,3,6,9,12,15,18,21 * * *"   # runs at :00 past hours 0,3,6,9,12,15,18,21 UTC
+    - cron: "30 1,4,7,10,13,16,19,22 * * *" # runs at :30 past hours 1,4,7,10,13,16,19,22 UTC
+    # Together these two lines produce a run every 90 minutes, all day, every day.
+  workflow_dispatch:
+
+# During first run (baseline), set cancel-in-progress: false so the
+# baseline can complete. Once snapshot is committed, change back to true.
+concurrency:
+  group: verycosmetics-monitor
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5.6.0
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4
+
+      - name: Run monitor
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_VERYCOSMETICS }}
+          RUN_ONCE: "true"
+        run: python verycosmetics_monitor.py
+
+      - name: Commit snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add snapshot_verycosmetics.json baseline_done_verycosmetics.txt || true
+          git diff --staged --quiet || git commit -m "chore: update snapshot [skip ci]"
+          git push

@@ -314,7 +314,7 @@ def _core_fields(product):
 
     fields = [
         {"name": "🏷️ Brand",          "value": vendor or "-",                         "inline": True},
-        {"name": "🔢 Barcode",         "value": f"`{barcode}`" if barcode else "-",     "inline": True},
+        {"name": "🔢 GTIN / EAN",     "value": f"`{barcode}`" if barcode else "-",     "inline": True},
         {"name": "🔖 SKU",             "value": f"`{sku}`" if sku else "-",             "inline": True},
         {"name": "📊 Stock",           "value": stock_val,                              "inline": True},
         {"name": "💷 Price (inc-VAT)", "value": f"£{vat(product.get('price',''))}",    "inline": True},
@@ -364,7 +364,8 @@ def _embed(title, url, colour, fields, product, footer_suffix=""):
 
 def notify_new(product):
     fields = [
-        {"name": "💰 Price (ex-VAT)", "value": price_display(product), "inline": True},
+        {"name": "💰 New Price",       "value": product.get("price", "-"), "inline": True},
+        {"name": "💷 Was",            "value": price_display(product), "inline": True},
     ] + _core_fields(product)
 
     _send({"embeds": [_embed(
@@ -376,7 +377,8 @@ def notify_new(product):
 
 def notify_back_in_stock(product):
     fields = [
-        {"name": "💰 Price (ex-VAT)", "value": price_display(product), "inline": True},
+        {"name": "💰 New Price",       "value": product.get("price", "-"), "inline": True},
+        {"name": "💷 Was",            "value": price_display(product), "inline": True},
     ] + _core_fields(product)
 
     _send({"embeds": [_embed(
@@ -392,7 +394,8 @@ def notify_restock(product, old_stock, new_stock):
         {"name": "📊 Was",    "value": f"{old_stock:,} units", "inline": True},
         {"name": "📊 Now",    "value": f"**{new_stock:,} units**", "inline": True},
         {"name": "📈 Change", "value": f"+{diff:,}" if isinstance(diff, int) else "?", "inline": True},
-        {"name": "💰 Price (ex-VAT)", "value": price_display(product), "inline": True},
+        {"name": "💰 New Price",       "value": product.get("price", "-"), "inline": True},
+        {"name": "💷 Was",            "value": price_display(product), "inline": True},
     ] + _sas_fields(product)
 
     _send({"embeds": [_embed(

@@ -239,6 +239,23 @@ def scrape_product_page(handle):
 
     return result
 
+
+def fetch_product_json(handle):
+    """Fetch barcode from Shopify product JSON — fast, no HTML scraping."""
+    url = f"{BASE_URL}/products/{handle}.json"
+    try:
+        r = SESSION.get(url, timeout=15)
+        r.raise_for_status()
+        product = r.json().get("product", {})
+        for v in product.get("variants", []):
+            barcode = (v.get("barcode") or "").strip()
+            if barcode:
+                return barcode
+    except Exception:
+        pass
+    return ""
+
+
 # ---------------------------------------------------------------------------
 # HELPERS
 # ---------------------------------------------------------------------------
@@ -568,6 +585,24 @@ def run_check():
         new_price    = product.get("price", "")
         old_stock    = old.get("stock")
         new_stock    = product.get("stock")
+
+        # Determine if this product will trigger an alert
+        will_alert_back  = not was_in_stock and now_in_stock
+        old_f_check      = safe_float(old_price)
+        new_f_check      = safe_float(new_price)
+        will_alert_drop  = (now_in_stock and old_f_check and new_f_check and old_f_check > 0
+                            and (old_f_check - new_f_check) / old_f_check > 0.01
+                            and (old_f_check - new_f_check) > 0.02)
+
+        # If this product will alert but still has no barcode, fetch it now
+        # from the product JSON (fast API call, no HTML scraping needed)
+        if (will_alert_back or will_alert_drop) and not product.get("barcode") and product.get("handle"):
+            try:
+                barcode = fetch_product_json(product["handle"])
+                if barcode:
+                    product["barcode"] = barcode
+            except Exception:
+                pass
 
         # Back in stock
         if not was_in_stock and now_in_stock:
